@@ -2,6 +2,7 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 import numpy as np
+import time
 
 from ..data import SquadExample, SquadFeatures, squad_convert_examples_to_features
 from ..file_utils import PaddingStrategy, add_end_docstrings, is_tf_available, is_torch_available
@@ -300,6 +301,7 @@ class QuestionAnsweringPipeline(Pipeline):
                 features_list.append(features)
 
         all_answers = []
+        inference_time_arr = []
         for features, example in zip(features_list, examples):
             model_input_names = self.tokenizer.model_input_names
             fw_args = {k: [feature.__dict__[k] for feature in features] for k in model_input_names}
@@ -316,7 +318,12 @@ class QuestionAnsweringPipeline(Pipeline):
                         fw_args = {k: torch.tensor(v, device=self.device) for (k, v) in fw_args.items()}
                         # On Windows, the default int type in numpy is np.int32 so we get some non-long tensors.
                         fw_args = {k: v.long() if v.dtype == torch.int32 else v for (k, v) in fw_args.items()}
+                        
+                        # Measuring DL framework inference time
+                        inference_time = time.time()
                         start, end = self.model(**fw_args)[:2]
+                        inference_time_arr.append(time.time() - inference_time)
+                        #print("Pytorch BERT inference time: {:.2f} ms".format(1000*inference_time))
                         start, end = start.cpu().numpy(), end.cpu().numpy()
 
             min_null_score = 1000000  # large and positive
@@ -403,8 +410,8 @@ class QuestionAnsweringPipeline(Pipeline):
             all_answers += answers
 
         if len(all_answers) == 1:
-            return all_answers[0]
-        return all_answers
+            return all_answers[0], np.sum(inference_time_arr)
+        return all_answers, np.sum(inference_time_arr)
 
     def decode(
         self, start: np.ndarray, end: np.ndarray, topk: int, max_answer_len: int, undesired_tokens: np.ndarray
