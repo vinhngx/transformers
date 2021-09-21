@@ -367,10 +367,11 @@ def main():
     """
     
     # train from scratch
-    config.gradient_checkpointing = True
-    config.use_cache=False
-    model = AutoModelForCausalLM.from_config(config)
+    #config.gradient_checkpointing = True
+    #config.use_cache=False
+    logger.info("Gradient checkpointing: {}".format(config.gradient_checkpointing))
     
+    model = AutoModelForCausalLM.from_config(config)    
     n_params = sum(dict((p.data_ptr(), p.numel()) for p in model.parameters()).values())
     logger.info(f"Training new model from scratch - Total size={n_params/2**20:.2f}M params")
         
